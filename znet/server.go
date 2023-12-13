@@ -2,6 +2,7 @@ package znet
 
 import (
 	"Yolozinx/ziface"
+	"errors"
 	"fmt"
 	"net"
 )
@@ -16,6 +17,19 @@ type Server struct {
 	IP string
 	// 服务器监听的端口
 	Port int
+}
+
+// CallBackToClient 暂时的 写死的回调业务方法
+// 定义当前客户端链接所绑定的handle api (目前这个handle是写死的，1以后优化应该由用户自定义handle方法)
+func CallBackToClient(conn *net.TCPConn, data []byte, cnt int) error {
+	// 回显业务
+	fmt.Println("[Conn Handle] CallBackToClient")
+	// 将客户端传来的数据，回显给客户端
+	if _, err := conn.Write(data[:cnt]); err != nil {
+		fmt.Println("write back buf err", err)
+		return errors.New("CallBackToClient error")
+	}
+	return nil
 }
 
 // Start 实现了IServer接口的Start方法 启动服务器
@@ -45,33 +59,26 @@ func (s *Server) Start() {
 		}
 		fmt.Println("start Zinx server success,", s.Name, "succ, Listenning....")
 		// 监听本地端口已经成功
+
+		var cid uint32
+		cid = 0
 		//3. 阻塞等待客户端进行连接，处理客户端连接业务(读写) 这里会阻塞，所以改成异步的操作
-		for {
-			// 如果有客户端连接过来，阻塞会返回
+		for { // 循环监听等待是否有客户端进行链接
+			// 如果有客户端连接过来，这里回阻塞返回conn, conn就是客户端和服务器建立的连接
 			conn, err := listenner.AcceptTCP()
 			if err != nil {
 				fmt.Println("Accept err", err)
 				continue
 			}
 			// 已经与客户端建立连接，做一些业务， 做一个最基本的512字节长度的回显业务
-			go func() {
-				for {
-					buf := make([]byte, 512)
-					//将buf这个字节切片，通过conn的Read方法，读到这个buf中，返回一个成功读的字节和错误编码，cnt表示已经读到的字节大小
-					cnt, err := conn.Read(buf)
-					if err != nil {
-						fmt.Println("recv buf err", err)
-						return
-					}
-					// 如果读成功
-					fmt.Printf("recv client buf %s, cnt %d \n", buf, cnt)
-					// 回显功能  将从开头， 到已经读到的位置写到buf里
-					if _, err := conn.Write(buf[0:cnt]); err != nil {
-						fmt.Println("write back buf err", err)
-						continue
-					}
-				}
-			}()
+			// 得到conn后，通过NewConnection初始化链接
+			// 将处理新链接的业务方法和conn进行绑定，得到我们的链接模块
+			dealConn := NewConnection(conn, cid, CallBackToClient)
+			// 初始完后将cid++，等待赋值给新的连接
+			cid++
+
+			// 启动当前链接的业务处理
+			go dealConn.Start()
 		}
 	}()
 
