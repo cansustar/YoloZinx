@@ -61,9 +61,10 @@ func (s *Server) Start() {
 					cnt, err := conn.Read(buf)
 					if err != nil {
 						fmt.Println("recv buf err", err)
-						continue
+						return
 					}
 					// 如果读成功
+					fmt.Printf("recv client buf %s, cnt %d \n", buf, cnt)
 					// 回显功能  将从开头， 到已经读到的位置写到buf里
 					if _, err := conn.Write(buf[0:cnt]); err != nil {
 						fmt.Println("write back buf err", err)
