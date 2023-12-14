@@ -2,7 +2,6 @@ package znet
 
 import (
 	"Yolozinx/ziface"
-	"errors"
 	"fmt"
 	"net"
 )
@@ -17,20 +16,22 @@ type Server struct {
 	IP string
 	// 服务器监听的端口
 	Port int
+	// 当前的Server添加一个router,server注册链接对应的处理业务
+	Router ziface.IRouter
 }
 
-// CallBackToClient 暂时的 写死的回调业务方法
-// 定义当前客户端链接所绑定的handle api (目前这个handle是写死的，1以后优化应该由用户自定义handle方法)
-func CallBackToClient(conn *net.TCPConn, data []byte, cnt int) error {
-	// 回显业务
-	fmt.Println("[Conn Handle] CallBackToClient")
-	// 将客户端传来的数据，回显给客户端
-	if _, err := conn.Write(data[:cnt]); err != nil {
-		fmt.Println("write back buf err", err)
-		return errors.New("CallBackToClient error")
-	}
-	return nil
-}
+//// CallBackToClient 暂时的 写死的回调业务方法
+//// 定义当前客户端链接所绑定的handle api TODO(目前这个handle是写死的，1以后优化应该由用户自定义handle方法)
+//func CallBackToClient(conn *net.TCPConn, data []byte, cnt int) error {
+//	// 回显业务
+//	fmt.Println("[Conn Handle] CallBackToClient")
+//	// 将客户端传来的数据，回显给客户端
+//	if _, err := conn.Write(data[:cnt]); err != nil {
+//		fmt.Println("write back buf err", err)
+//		return errors.New("CallBackToClient error")
+//	}
+//	return nil
+//}
 
 // Start 实现了IServer接口的Start方法 启动服务器
 func (s *Server) Start() {
@@ -73,7 +74,7 @@ func (s *Server) Start() {
 			// 已经与客户端建立连接，做一些业务， 做一个最基本的512字节长度的回显业务
 			// 得到conn后，通过NewConnection初始化链接
 			// 将处理新链接的业务方法和conn进行绑定，得到我们的链接模块
-			dealConn := NewConnection(conn, cid, CallBackToClient)
+			dealConn := NewConnection(conn, cid, s.Router)
 			// 初始完后将cid++，等待赋值给新的连接
 			cid++
 
@@ -102,6 +103,12 @@ func (s *Server) Serve() {
 	select {}
 }
 
+// AddRouter 实现AddRouter
+func (s *Server) AddRouter(router ziface.IRouter) {
+	s.Router = router
+	fmt.Println("Add Router Succ!!")
+}
+
 // NewServer 初始化Server模块的方法  应该返回一个抽象层的IServer
 func NewServer(name string) ziface.IServer {
 	s := &Server{
@@ -109,6 +116,7 @@ func NewServer(name string) ziface.IServer {
 		IPVersion: "tcp4",
 		IP:        "0.0.0.0",
 		Port:      8999,
+		Router:    nil,
 	}
 	return s
 }
